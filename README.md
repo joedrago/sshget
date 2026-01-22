@@ -12,14 +12,25 @@ Download files and directories from remote servers over HTTP via multiple parall
 
 ## Installation
 
+Install globally from GitHub:
+
 ```bash
-npm install -g sshget
+npm install -g github:yourusername/sshget
 ```
 
-Or use directly with npx:
+Or clone and link locally:
 
 ```bash
-npx sshget user@host:path/to/file
+git clone https://github.com/yourusername/sshget.git
+cd sshget
+npm install
+npm link
+```
+
+Or run directly with npx:
+
+```bash
+npx github:yourusername/sshget user@host:path/to/file
 ```
 
 ## CLI Usage
