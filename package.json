@@ -1,0 +1,42 @@
+{
+    "name": "sshget",
+    "version": "1.0.0",
+    "description": "Download files/directories from remote servers over HTTP via multiple parallel SSH tunnels",
+    "type": "module",
+    "bin": {
+        "sshget": "./bin/sshget.js"
+    },
+    "exports": {
+        ".": "./lib/index.js"
+    },
+    "scripts": {
+        "test": "echo \"No tests yet\" && exit 0",
+        "lint": "eslint .",
+        "format": "prettier --write ."
+    },
+    "keywords": [
+        "ssh",
+        "download",
+        "tunnel",
+        "parallel",
+        "transfer"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "chalk": "^5.3.0",
+        "commander": "^12.0.0"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.18.0",
+        "eslint": "^9.18.0",
+        "globals": "^15.14.0",
+        "prettier": "^3.4.2"
+    },
+    "prettier": {
+        "printWidth": 130,
+        "tabWidth": 4,
+        "trailingComma": "none",
+        "semi": false
+    }
+}

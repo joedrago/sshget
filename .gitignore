@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Lock files
+package-lock.json
+
+# Editor and IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temp files
+*.sshget.tmp
+*.log
+*.tmp
+
+# Environment
+.env
+.env.*
+
+# Coverage and test output
+coverage/
+.nyc_output/
