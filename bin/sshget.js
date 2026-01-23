@@ -14,11 +14,43 @@ function parsePort(value) {
     return parsed
 }
 
+function printUsage() {
+    console.log(`Usage: sshget [options] <source...> <destination>
+
+Download files/directories from remote servers over HTTP via multiple parallel SSH tunnels.
+
+Arguments:
+  source...    One or more remote paths (user@host:path) - wildcards (*) supported
+  destination  Local destination path
+
+Options:
+  -t, --tunnels <n>    Number of parallel tunnels (default: 8)
+  -p, --port <port>    Local/remote port for HTTP server (default: "auto")
+  -P, --ssh-port <n>   Remote SSH port (default: 22)
+  -i, --identity <key> SSH private key path
+  --password           Prompt for password (uses sshpass)
+  -c, --compress       Enable SSH compression
+  -v, --verbose        Verbose output
+  --no-progress        Disable progress display
+  -h, --help           Display help
+
+Examples:
+  sshget user@host:file.txt .
+  sshget user@host:dir/ ./local/
+  sshget "user@host:*.txt" ./downloads/
+  sshget user@host:file1 user@host:file2 ./dest/`)
+}
+
+// Check for no arguments or help
+if (process.argv.length <= 2) {
+    printUsage()
+    process.exit(0)
+}
+
 program
     .name("sshget")
     .description("Download files/directories from remote servers over HTTP via multiple parallel SSH tunnels")
-    .argument("<source>", "Remote path (user@host:path) - wildcards (*) supported")
-    .argument("[destination]", "Local path", process.cwd())
+    .argument("<paths...>", "Remote source(s) and local destination (last argument is destination)")
     .option("-t, --tunnels <n>", "Number of parallel tunnels", parseInt, 8)
     .option("-p, --port <port>", "Local/remote port for HTTP server (auto = find available)", parsePort, "auto")
     .option("-P, --ssh-port <n>", "Remote SSH port", parseInt, 22)
@@ -27,7 +59,26 @@ program
     .option("-c, --compress", "Enable SSH compression")
     .option("-v, --verbose", "Verbose output")
     .option("--no-progress", "Disable progress display")
-    .action(async (source, destination, options) => {
+    .action(async (paths, options) => {
+        // Need at least 2 paths: source(s) and destination
+        if (paths.length < 2) {
+            console.error("Error: At least one source and a destination are required.")
+            printUsage()
+            process.exit(1)
+        }
+
+        const destination = paths[paths.length - 1]
+        const sources = paths.slice(0, -1)
+
+        // Check if destination looks like a remote source
+        if (destination.includes("@") || destination.includes(":")) {
+            console.error(`Error: Destination "${destination}" looks like a remote path.`)
+            console.error('If you want to download to the current directory, use "." as the destination.')
+            console.error("")
+            console.error("Example: sshget user@host:file.txt .")
+            process.exit(1)
+        }
+
         let sshget = null
         let display = null
         let shuttingDown = false
@@ -80,7 +131,7 @@ program
             }
 
             sshget = new SSHGet({
-                source,
+                sources,
                 destination,
                 tunnels: options.tunnels,
                 basePort: options.port,
