@@ -43,7 +43,7 @@ Arguments:
   destination           Local path (default: current directory)
 
 Options:
-  -t, --tunnels <n>     Number of parallel tunnels (default: 4)
+  -t, --tunnels <n>     Number of parallel tunnels (default: 8)
   -p, --port <n>        Starting local port (default: 12346)
   -P, --ssh-port <n>    Remote SSH port (default: 22)
   -i, --identity <key>  SSH private key path
@@ -118,7 +118,7 @@ await transfer.download()
 | ------------------- | ------- | --------------- | ---------------------------------------- |
 | `source`            | string  | required        | Remote path in format `[user@]host:path` |
 | `destination`       | string  | `process.cwd()` | Local destination path                   |
-| `tunnels`           | number  | `4`             | Number of parallel SSH tunnels           |
+| `tunnels`           | number  | `8`             | Number of parallel SSH tunnels           |
 | `basePort`          | number  | `12346`         | Starting local port for tunnels          |
 | `compress`          | boolean | `false`         | Enable SSH compression                   |
 | `password`          | string  | `null`          | SSH password (requires sshpass)          |

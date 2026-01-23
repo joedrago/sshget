@@ -9,7 +9,7 @@ program
     .description("Download files/directories from remote servers over HTTP via multiple parallel SSH tunnels")
     .argument("<source>", "Remote path (user@host:path)")
     .argument("[destination]", "Local path", process.cwd())
-    .option("-t, --tunnels <n>", "Number of parallel tunnels", parseInt, 4)
+    .option("-t, --tunnels <n>", "Number of parallel tunnels", parseInt, 8)
     .option("-p, --port <n>", "Starting local port", parseInt, 12346)
     .option("-P, --ssh-port <n>", "Remote SSH port", parseInt, 22)
     .option("-i, --identity <key>", "SSH private key path")
