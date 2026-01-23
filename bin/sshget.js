@@ -2,15 +2,25 @@
 
 import { program } from "commander"
 import { createInterface } from "readline"
+import { existsSync, unlinkSync } from "fs"
 import { SSHGet, ProgressDisplay } from "../lib/index.js"
+
+function parsePort(value) {
+    if (value === "auto") return "auto"
+    const parsed = parseInt(value, 10)
+    if (isNaN(parsed)) {
+        throw new Error(`Invalid port: ${value}`)
+    }
+    return parsed
+}
 
 program
     .name("sshget")
     .description("Download files/directories from remote servers over HTTP via multiple parallel SSH tunnels")
-    .argument("<source>", "Remote path (user@host:path)")
+    .argument("<source>", "Remote path (user@host:path) - wildcards (*) supported")
     .argument("[destination]", "Local path", process.cwd())
     .option("-t, --tunnels <n>", "Number of parallel tunnels", parseInt, 8)
-    .option("-p, --port <n>", "Starting local port", parseInt, 12346)
+    .option("-p, --port <port>", "Local/remote port for HTTP server (auto = find available)", parsePort, "auto")
     .option("-P, --ssh-port <n>", "Remote SSH port", parseInt, 22)
     .option("-i, --identity <key>", "SSH private key path")
     .option("--password", "Prompt for password (uses sshpass)")
@@ -18,6 +28,50 @@ program
     .option("-v, --verbose", "Verbose output")
     .option("--no-progress", "Disable progress display")
     .action(async (source, destination, options) => {
+        let sshget = null
+        let display = null
+        let shuttingDown = false
+
+        // Graceful shutdown handler (like whatsync)
+        const shutdown = async () => {
+            if (shuttingDown) return
+            shuttingDown = true
+
+            if (display) {
+                display.stop()
+            }
+
+            console.log("\nAborting, cleaning up...")
+
+            if (sshget) {
+                // Abort returns list of temp files to clean up
+                const tempFiles = sshget.abort()
+
+                // Clean up temp files
+                for (const tempPath of tempFiles) {
+                    try {
+                        if (existsSync(tempPath)) {
+                            unlinkSync(tempPath)
+                        }
+                    } catch (_err) {
+                        // Ignore cleanup errors
+                    }
+                }
+
+                // Close tunnels
+                try {
+                    await sshget.cleanup()
+                } catch (_err) {
+                    // Ignore cleanup errors
+                }
+            }
+
+            process.exit(0)
+        }
+
+        process.on("SIGINT", shutdown)
+        process.on("SIGTERM", shutdown)
+
         try {
             let password = null
 
@@ -25,7 +79,7 @@ program
                 password = await promptPassword()
             }
 
-            const sshget = new SSHGet({
+            sshget = new SSHGet({
                 source,
                 destination,
                 tunnels: options.tunnels,
@@ -38,7 +92,7 @@ program
             })
 
             if (options.progress !== false) {
-                new ProgressDisplay(sshget, {
+                display = new ProgressDisplay(sshget, {
                     verbose: options.verbose,
                     showTunnels: options.verbose
                 })
@@ -46,6 +100,8 @@ program
 
             await sshget.download()
         } catch (err) {
+            if (shuttingDown) return // Don't report errors during shutdown
+
             if (options.verbose) {
                 console.error(err)
             } else {

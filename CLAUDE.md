@@ -36,6 +36,8 @@ Manages SSH tunnel lifecycle:
 - Handles sshpass integration for password auth
 - Provides `acquire()`/`release()` for tunnel allocation
 - Can execute remote commands via `execRemote()`
+- Auto port detection: finds available ephemeral ports on local and remote sides
+- Wildcard expansion via `expandWildcard()` for glob patterns
 
 ### Downloader (`lib/Downloader.js`)
 
@@ -117,8 +119,32 @@ const chunkSize = Math.ceil(fileSize / numTunnels)
 
 ### Tunnel Setup
 
-1. Primary tunnel: `ssh -tt -L localPort:127.0.0.1:remotePort user@host 'python3 -c "..."'`
+1. Primary tunnel: `ssh -tt -L localPort:127.0.0.1:remotePort user@host 'exec python3 -c "..."'`
 2. Secondary tunnels: `ssh -N -L localPort:127.0.0.1:remotePort user@host`
+
+The `-tt` flag forces PTY allocation, which ensures the remote Python server receives SIGHUP when the SSH connection drops. The `exec` prefix replaces the shell process with Python, ensuring clean termination.
+
+### Port Allocation
+
+Default is "auto" which:
+
+1. Finds an available remote port using Python socket binding
+2. Finds available local ports for each tunnel using Node.js net.Server
+
+Fixed port mode allocates sequential ports: basePort, basePort+1, ..., basePort+N-1
+
+### Graceful Shutdown
+
+On SIGINT/SIGTERM:
+
+1. Aborts download and collects list of active temp files
+2. Deletes all `.sshget.tmp` files being written
+3. Closes all SSH tunnels
+4. Exits cleanly
+
+### Wildcard Support
+
+Remote paths can contain `*` and `?` wildcards. The pattern is expanded on the remote side using shell globbing before download begins.
 
 ## Testing
 
@@ -136,6 +162,14 @@ sshget -v user@host:path/to/large.iso
 
 # Custom tunnel count
 sshget -t 8 user@host:path/to/file
+
+# Wildcard pattern (downloads all matching files)
+sshget user@host:*.txt
+
+# Fixed port instead of auto
+sshget -p 12346 user@host:path/to/file
+
+# Ctrl+C gracefully cleans up temp files
 ```
 
 ## Dependencies
