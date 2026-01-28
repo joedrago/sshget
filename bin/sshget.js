@@ -4,6 +4,7 @@ import { program } from "commander"
 import { createInterface } from "readline"
 import { existsSync, unlinkSync } from "fs"
 import { SSHGet, ProgressDisplay } from "../lib/index.js"
+import { initLogger, closeLogger } from "../lib/Logger.js"
 
 function printUsage() {
     console.log(`Usage: sshget [options] <source...> <destination>
@@ -20,7 +21,7 @@ Options:
   -i, --identity <key> SSH private key path
   --password           Prompt for password (uses sshpass)
   -c, --compress       Enable SSH compression
-  -v, --verbose        Verbose output
+  -v, --verbose        Enable verbose logging to .sshget.log
   --no-progress        Disable progress display
   -h, --help           Display help
 
@@ -106,11 +107,17 @@ program
                 }
             }
 
+            closeLogger()
             process.exit(0)
         }
 
         process.on("SIGINT", shutdown)
         process.on("SIGTERM", shutdown)
+
+        // Initialize file logger if verbose
+        if (options.verbose) {
+            initLogger(true)
+        }
 
         try {
             let password = null
@@ -138,9 +145,11 @@ program
             }
 
             await sshget.download()
+            closeLogger()
         } catch (err) {
             if (shuttingDown) return // Don't report errors during shutdown
 
+            closeLogger()
             if (options.verbose) {
                 console.error(err)
             } else {
