@@ -24,3 +24,4 @@ package-lock.json
 # Coverage and test output
 coverage/
 .nyc_output/
+testfile_100mb

@@ -5,27 +5,17 @@ import { createInterface } from "readline"
 import { existsSync, unlinkSync } from "fs"
 import { SSHGet, ProgressDisplay } from "../lib/index.js"
 
-function parsePort(value) {
-    if (value === "auto") return "auto"
-    const parsed = parseInt(value, 10)
-    if (isNaN(parsed)) {
-        throw new Error(`Invalid port: ${value}`)
-    }
-    return parsed
-}
-
 function printUsage() {
     console.log(`Usage: sshget [options] <source...> <destination>
 
-Download files/directories from remote servers over HTTP via multiple parallel SSH tunnels.
+Download files/directories from remote servers via multiple parallel SSH connections.
 
 Arguments:
   source...    One or more remote paths (user@host:path) - wildcards (*) supported
   destination  Local destination path
 
 Options:
-  -t, --tunnels <n>    Number of parallel tunnels (default: 8)
-  -p, --port <port>    Local/remote port for HTTP server (default: "auto")
+  -t, --tunnels <n>    Number of parallel SSH connections (default: 8)
   -P, --ssh-port <n>   Remote SSH port (default: 22)
   -i, --identity <key> SSH private key path
   --password           Prompt for password (uses sshpass)
@@ -49,11 +39,10 @@ if (process.argv.length <= 2) {
 
 program
     .name("sshget")
-    .description("Download files/directories from remote servers over HTTP via multiple parallel SSH tunnels")
+    .description("Download files/directories from remote servers via multiple parallel SSH connections")
     .argument("<paths...>", "Remote source(s) and local destination (last argument is destination)")
-    .option("-t, --tunnels <n>", "Number of parallel tunnels", parseInt, 8)
-    .option("-p, --port <port>", "Local/remote port for HTTP server (auto = find available)", parsePort, "auto")
-    .option("-P, --ssh-port <n>", "Remote SSH port", parseInt, 22)
+    .option("-t, --tunnels <n>", "Number of parallel SSH connections", (v) => parseInt(v, 10), 8)
+    .option("-P, --ssh-port <n>", "Remote SSH port", (v) => parseInt(v, 10), 22)
     .option("-i, --identity <key>", "SSH private key path")
     .option("--password", "Prompt for password (uses sshpass)")
     .option("-c, --compress", "Enable SSH compression")
@@ -134,7 +123,6 @@ program
                 sources,
                 destination,
                 tunnels: options.tunnels,
-                basePort: options.port,
                 sshPort: options.sshPort,
                 privateKey: options.identity,
                 password,

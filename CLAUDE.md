@@ -16,8 +16,8 @@ sshget/
 └── lib/
     ├── index.js          # Public exports
     ├── SSHGet.js         # Main orchestration class (EventEmitter)
-    ├── TunnelPool.js     # SSH tunnel management
-    ├── Downloader.js     # HTTP range request downloads
+    ├── AgentPool.js      # SSH agent connection management
+    ├── Downloader.js     # File downloads via agent protocol
     └── ProgressDisplay.js # Terminal UI rendering
 ```
 
@@ -27,21 +27,21 @@ sshget/
 
 Main orchestration class extending EventEmitter. Coordinates tunnel pool, downloader, and emits progress events. Entry point is `download()` method.
 
-### TunnelPool (`lib/TunnelPool.js`)
+### AgentPool (`lib/AgentPool.js`)
 
-Manages SSH tunnel lifecycle:
+Manages SSH agent connections:
 
-- Spawns primary tunnel with embedded Python HTTP server (with Range support)
-- Spawns N-1 secondary tunnels as port forwards only (`-N` flag)
+- Spawns N SSH connections, each running an embedded Python agent
+- Binary protocol over stdin/stdout (no HTTP, no port forwarding)
 - Handles sshpass integration for password auth
-- Provides `acquire()`/`release()` for tunnel allocation
-- Can execute remote commands via `execRemote()`
-- Auto port detection: finds available ephemeral ports on local and remote sides
+- Provides `acquire()`/`release()` for agent allocation
+- `readRangeStreaming()` for efficient byte-range file reads
+- Can execute remote commands via `execRemote()` for file listings
 - Wildcard expansion via `expandWildcard()` for glob patterns
 
 ### Downloader (`lib/Downloader.js`)
 
-Handles HTTP downloads:
+Handles file downloads via agent protocol:
 
 - `downloadFile()` - whole file download
 - `downloadRange()` - specific byte range download
@@ -56,14 +56,14 @@ Terminal UI that auto-attaches to SSHGet events:
 - Progress bars with percentage, bytes, speed, ETA
 - Tunnel status display
 
-## Embedded Python HTTP Server
+## Embedded Python Agent
 
-Located in `TunnelPool.js` as `PYTHON_HTTP_SERVER` constant. Key features:
+Located in `AgentPool.js` as `PYTHON_AGENT` constant. Key features:
 
-- `ThreadingHTTPServer` for parallel requests
-- Range header parsing (bytes=start-end)
-- Returns 206 Partial Content with Content-Range header
-- Listens on 127.0.0.1 only (accessed via SSH tunnel)
+- Minimal binary protocol over stdin/stdout
+- Request: `path_len(2) + path + offset(8) + length(8)`
+- Response: `status(1) + data_len(8) + data`
+- No ports, no HTTP overhead - direct streaming through SSH channel
 
 ## Commands
 
@@ -117,21 +117,13 @@ const chunkSize = Math.ceil(fileSize / numTunnels)
 // Each tunnel downloads one chunk via Range request
 ```
 
-### Tunnel Setup
+### Agent Setup
 
-1. Primary tunnel: `ssh -tt -L localPort:127.0.0.1:remotePort user@host 'exec python3 -c "..."'`
-2. Secondary tunnels: `ssh -N -L localPort:127.0.0.1:remotePort user@host`
+Each agent: `ssh -T user@host 'exec python3 -c "AGENT_CODE"'`
 
-The `-tt` flag forces PTY allocation, which ensures the remote Python server receives SIGHUP when the SSH connection drops. The `exec` prefix replaces the shell process with Python, ensuring clean termination.
+The `-T` flag disables PTY allocation, which is required for the binary protocol (PTY would corrupt binary data). The agent exits cleanly when stdin closes (SSH disconnect). The `exec` prefix replaces the shell process with Python.
 
-### Port Allocation
-
-Default is "auto" which:
-
-1. Finds an available remote port using Python socket binding
-2. Finds available local ports for each tunnel using Node.js net.Server
-
-Fixed port mode allocates sequential ports: basePort, basePort+1, ..., basePort+N-1
+No port allocation is needed - all communication happens over the SSH stdin/stdout channel.
 
 ### Graceful Shutdown
 
@@ -165,9 +157,6 @@ sshget -t 8 user@host:path/to/file
 
 # Wildcard pattern (downloads all matching files)
 sshget user@host:*.txt
-
-# Fixed port instead of auto
-sshget -p 12346 user@host:path/to/file
 
 # Ctrl+C gracefully cleans up temp files
 ```
