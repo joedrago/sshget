@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --max-old-space-size=8192
 
 import { program } from "commander"
 import { createInterface } from "readline"
